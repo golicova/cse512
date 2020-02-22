@@ -1,5 +1,5 @@
 /*
- * Author		: Karant
+ * Author		: Julia Gulia in Collaboration with Chris Goosman
  * Course		: CSE-512
  * Assignment	: Lab Assignment 2
  * Description	: Program takes input containing data of the starting state
@@ -14,6 +14,7 @@
 #include <vector>
 #include <sstream>
 #include <limits> // for alpha and beta values
+#include <algorithm>
 
 using namespace std;
 
@@ -28,6 +29,14 @@ struct State
 	bool leftEdge;
 	bool rightEdge;
 	bool middle;
+
+	State()
+	{
+		moveType = "Steak";
+		leftEdge = false;
+		rightEdge = false;
+		middle = false;
+	}
 };
 
 class Board
@@ -37,31 +46,55 @@ public:
 	void Input();	 // read input from file
 	void PrintData(); // print member variable values
 
-	//recursive call to make children board states
-	void makeChildren(int d, vector<string> bs, string p);
+	//int minimax(int eval, bool m, int d);
+	int minimax(State s, int d, bool max, string p);
+
+	//alphabeta
+	int alphabeta(State s, int d, bool max, string p, int alpha, int beta);
 
 	// check for adjacency adn for raid
 	bool is_adjacent(State &s, string p, int pos);
 	bool is_raid(State &s, string p, int pos);
 
 	void setEval(State &s);
+	void setMove(State &s, int i);
+
+	void runAlgorithm();
+
+	void printBestState()
+	{
+		for (int i = 0; i < size * size; i++)
+		{
+			if (i % size == 0)
+				cout << endl;
+			cout << bestState.nodeState[i];
+		}
+		cout << bestState.move << endl;
+		cout << bestState.moveType << endl;
+		cout << bestState.eval << endl;
+	}
 
 	// GETTER FUNCTIONS
-	vector<string> getBoardState() { return boardState; };
+	//vector<string> getBoardState() { return boardState; };
 	int getDepth() { return depth; }
 	string getPlayer() { return player; }
+	State getInit()
+	{
+		return initialState;
+	}
 
 private:
-	int size;	  // store value that will determine the size of the board
-	string mode;   // store value for the game mode (MINIMAX, ALPHABETA
-	string player; // store the player whose turn it is. (X or O)a
-	int depth;	 // store the value of the depth limit of search. (>=1)
-	//int available; // stores the value of available spaces on the board
-	int alpha;				   // alpha value to be used with alphabeta pruning
-	int beta;				   // beta value to be used with alphabeta pruning
-	vector<int> cellValues;	// hold the integer values of the board cells
-	vector<string> boardState; // hold the starting state of the board
-	vector<State> children;	// children nodes of the board state
+	string arr[26] = {"A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"};
+	int size;				   	// store value that will determine the size of the board
+	string mode;			   	// store value for the game mode (MINIMAX, ALPHABETA
+	string player;			   	// store the player whose turn it is. (X or O)a
+	int depth;				   	// store the value of the depth limit of search. (>=1)
+	int alpha;				   	// alpha value to be used with alphabeta pruning
+	int beta;				   	// beta value to be used with alphabeta pruning
+	vector<int> cellValues;		// hold the integer values of the board cells
+	//vector<string> boardState; 	// hold the starting state of the board
+	State initialState;			// holds initial state of the board
+	State bestState;			// holds the state with the best move
 };
 
 Board::Board()
@@ -71,10 +104,10 @@ Board::Board()
 	mode = "";
 	player = "";
 	depth = 0;
-	//available = 0;
 	// set alpha and beta to lowest int value and greatest int value
 	alpha = numeric_limits<int>::min();
 	beta = numeric_limits<int>::max();
+	bestState.eval = numeric_limits<int>::min();
 } // end Board
 
 void Board::Input()
@@ -128,14 +161,13 @@ void Board::Input()
 			for (int i = 0; i < size; i++)
 			{
 				string val(1, temp.at(i));
-				/* checks to see if any spaces are occupied and updates available spaces
-				if (val != ".") available--; */
-				boardState.push_back(val);
+				initialState.nodeState.push_back(val);
 			}
 		}
 		// increment the counter
 		counter++;
 	}
+	infile.close();
 } // end Input
 
 void Board::PrintData()
@@ -157,80 +189,13 @@ void Board::PrintData()
 	cout << endl;
 
 	// print the board state grid
-	for (int i = 0; i < boardState.size(); i++)
+	for (int i = 0; i < size * size; i++)
 	{
 		if (i % size == 0)
 			cout << endl;
-		cout << boardState[i];
-	}
-
-	/***************************/
-	// print the children state
-	// MAKE INTO A RECURSIVE FUNCTION FOR ALL CHILDREN
-	for (int i = 0; i < children.size(); i++)
-	{
-		cout << endl;
-		for (int j = 0; j < children[i].nodeState.size(); j++)
-		{
-			if (j % size == 0)
-				cout << endl;
-			cout << children[i].nodeState[j];
-		}
-		cout << "\tMiddle: " << boolalpha << children[i].middle << endl;
-		cout << "\tMoveType: " << children[i].moveType << endl;
-		cout << "\tEvaluation: " << children[i].eval;
+		cout << initialState.nodeState[i];
 	}
 } // end PrintData
-
-/**************
-****************
-****************/
-// UPDATE TO BE RECURSIVE UNTIL ALL CHILDREN ALL CREATED FOR ALL DEPTHS
-void Board::makeChildren(int d, vector<string> bs, string p)
-{
-	// decrement depth of search
-	d--;
-	for (int i = 0; i < size * size; i++)
-	{
-		vector<string> temp = bs;
-		State state;
-
-		if (bs[i] == ".")
-		{
-			temp[i] = p;
-			state.nodeState = temp;
-			state.middle = false;
-			state.leftEdge = false;
-			state.rightEdge = false;
-			state.moveType = "Stake";
-			if (is_adjacent(state, p, i))
-			{
-				if (is_raid(state, p, i))
-				{
-					state.moveType = "Raid";
-				}
-			}
-
-			if (d == 0)
-			{
-				setEval(state);
-			}
-
-			children.push_back(state);
-			// call function until all children are created
-
-			if (d != 0)
-			{
-				string pp = p;
-				if (pp == "O")
-					pp = "X";
-				else
-					pp = "O";
-				makeChildren(d, state.nodeState, pp);
-			}
-		}
-	}
-} // end makeChildren
 
 /* 
 The setEval function needs to be called somewhere in the makeChildren function after the State has been initialized by temp. 
@@ -267,8 +232,9 @@ int main()
 {
 	Board board;
 	board.Input();
-	board.makeChildren(board.getDepth(), board.getBoardState(), board.getPlayer());
 	board.PrintData();
+	board.runAlgorithm();
+	board.printBestState();
 	return 0;
 }
 
@@ -376,7 +342,7 @@ bool Board::is_raid(State &s, string p, int pos)
 			raid = true;
 		}
 	}
-	else if(s.middle)
+	else if (s.middle)
 	{
 		if (s.nodeState[pos - 1] == opponent)
 		{
@@ -401,3 +367,193 @@ bool Board::is_raid(State &s, string p, int pos)
 	}
 	return raid;
 } // end is_raid
+
+void Board::setMove(State &s, int i)
+{
+	s.move = arr[i % size];
+	s.move += to_string((i / size) + 1);
+} // end setMove
+
+// {a, 0, 1, 2, b, 0, 1, 2}
+
+int Board::minimax(State s, int d, bool m, string p)
+{
+	if (d == 0)
+	{
+		setEval(s);
+		return s.eval;
+	}
+
+	int bestScore;
+
+	if (m)
+	{ // this is for max
+		bestScore = numeric_limits<int>::min();
+
+		for (int i = 0; i < size * size; i++)
+		{
+			State tempState;
+			tempState.nodeState = s.nodeState;
+			if (tempState.nodeState[i] == ".")
+			{
+				tempState.nodeState[i] = p;
+				setMove(tempState, i);
+				if (is_adjacent(tempState, p, i))
+				{
+					if (is_raid(tempState, p, i))
+					{
+						tempState.moveType = "Raid";
+					}
+				}
+				int score;
+				p = (p == "O") ? "X" : "O";
+				score = minimax(tempState, d - 1, false, p);
+				p = (p == "O") ? "X" : "O";
+				// compare scores
+				bestScore = max(bestScore, score);
+				// hold bestState
+				if (bestScore > bestState.eval and d == depth)
+				{
+					bestState.nodeState = tempState.nodeState;
+					bestState.move = tempState.move;
+					bestState.moveType = tempState.moveType;
+					bestState.eval = bestScore;
+				}
+			}
+		}
+		return bestScore;
+	}
+
+	else
+	{ // this is for min
+		bestScore = numeric_limits<int>::max();
+		for (int i = 0; i < size * size; i++)
+		{
+			State tempState;
+			tempState.nodeState = s.nodeState;
+			if (tempState.nodeState[i] == ".")
+			{
+				tempState.nodeState[i] = p;
+				setMove(tempState, i);
+				if (is_adjacent(tempState, p, i))
+				{
+					if (is_raid(tempState, p, i))
+					{
+						tempState.moveType = "Raid";
+					}
+				}
+				int score;
+				p = (p == "O") ? "X" : "O";
+				score = minimax(tempState, d - 1, true, p);
+				p = (p == "O") ? "X" : "O";
+				// compare scores
+				bestScore = min(bestScore, score);
+			}
+		}
+		return bestScore;
+	}
+}
+
+int Board::alphabeta(State s, int d, bool m, string p, int alpha, int beta)
+{
+	if (d == 0)
+	{
+		setEval(s);
+		return s.eval;
+	}
+
+	int bestScore;
+
+	if (m)
+	{ // this is for max
+		bestScore = numeric_limits<int>::min();
+
+		for (int i = 0; i < size * size; i++)
+		{
+			State tempState;
+			tempState.nodeState = s.nodeState;
+			if (tempState.nodeState[i] == ".")
+			{
+				tempState.nodeState[i] = p;
+				setMove(tempState, i);
+				if (is_adjacent(tempState, p, i))
+				{
+					if (is_raid(tempState, p, i))
+					{
+						tempState.moveType = "Raid";
+					}
+				}
+				int score;
+				p = (p == "O") ? "X" : "O";
+				score = alphabeta(tempState, d - 1, false, p, alpha, beta);
+				p = (p == "O") ? "X" : "O";
+				// compare scores
+				bestScore = max(bestScore, score);
+				alpha = max(bestScore, alpha);
+				if(alpha >= beta) break;
+				// hold bestState
+				if (bestScore > bestState.eval and d == depth)
+				{
+					bestState.nodeState = tempState.nodeState;
+					bestState.move = tempState.move;
+					bestState.moveType = tempState.moveType;
+					bestState.eval = bestScore;
+				}
+			}
+		}
+		return bestScore;
+	}
+
+	else
+	{ // this is for min
+		bestScore = numeric_limits<int>::max();
+		for (int i = 0; i < size * size; i++)
+		{
+			State tempState;
+			tempState.nodeState = s.nodeState;
+			if (tempState.nodeState[i] == ".")
+			{
+				tempState.nodeState[i] = p;
+				setMove(tempState, i);
+				if (is_adjacent(tempState, p, i))
+				{
+					if (is_raid(tempState, p, i))
+					{
+						tempState.moveType = "Raid";
+					}
+				}
+				int score;
+				p = (p == "O") ? "X" : "O";
+				score = alphabeta(tempState, d - 1, true, p, alpha, beta);
+				p = (p == "O") ? "X" : "O";
+				// compare scores
+				bestScore = min(bestScore, score);
+				beta = min(bestScore, beta);
+				if(beta <= alpha) break;
+			}
+		}
+		return bestScore;
+	}
+}
+
+void Board::runAlgorithm(){
+	if(mode == "MINIMAX"){
+			bestState.eval = minimax(initialState, depth, true, player);
+	}
+	// alphabeta
+	else {
+		bestState.eval = alphabeta(initialState, depth, true, player, alpha, beta);
+	}
+
+	// OUTPUT FILE
+	ofstream outfile("output.txt");
+
+	outfile << bestState.move << " " << bestState.moveType;
+
+	for(int i = 0; i < size * size; i++){
+		if(i % size == 0) outfile << endl;
+		outfile << bestState.nodeState[i];
+	}
+
+	outfile.close();
+}
